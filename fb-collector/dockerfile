@@ -1,0 +1,23 @@
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Копируем нужные файлы
+COPY fb-collector/package*.json ./
+COPY fb-collector/tsconfig*.json ./
+COPY fb-collector/src ./src
+COPY fb-collector/prisma ./prisma
+
+# Установка зависимостей и генерация Prisma клиента
+RUN npm install && \
+    npx prisma generate --schema=prisma/schema.prisma
+
+# Сборка проекта
+RUN npm run build
+
+# Проверка наличия скомпилированных файлов
+RUN ls dist
+
+# Запускаем генерацию Prisma и приложение
+CMD ["sh", "-c", "npx prisma generate --schema=prisma/schema.prisma && npm run start:prod"]
+

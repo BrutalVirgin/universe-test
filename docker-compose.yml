@@ -1,0 +1,101 @@
+version: '3.9'
+
+services:
+  gateway:
+    build:
+      context: ./gateway
+      dockerfile: Dockerfile
+    container_name: gateway
+    ports:
+      - "3000:3000"
+    networks:
+      - app-network
+    depends_on:
+      - nats
+      - postgres
+      - publisher
+    environment:
+      EVENT_ENDPOINT: "http://publisher:8080/events"
+
+  fb-collector:
+    container_name: fb-collector
+    build:
+      context: .
+      dockerfile: fb-collector/dockerfile
+    ports:
+      - "3001:3001"
+    networks:
+      - app-network
+    depends_on:
+      - nats
+      - postgres
+    environment:
+      DATABASE_URL: "postgresql://admin:admin@postgres:5432/events?schema=public"
+
+  ttk-collector:
+    build:
+      context: ./ttk-collector
+      dockerfile: Dockerfile
+    container_name: ttk-collector
+    ports:
+      - "3002:3002"
+    networks:
+      - app-network
+    depends_on:
+      - nats
+      - postgres
+
+  reporter:
+    build:
+      context: ./reporter
+      dockerfile: Dockerfile
+    container_name: reporter
+    ports:
+      - "3003:3003"
+    networks:
+      - app-network
+    depends_on:
+      - postgres
+
+  nats:
+    image: nats
+    container_name: nats-server
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+    networks:
+      - app-network
+    command: ["-js"]
+
+  postgres:
+    image: postgres:15
+    container_name: postgres
+    restart: always
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin
+      POSTGRES_DB: events
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./scripts:/docker-entrypoint-init.d/
+    networks:
+      - app-network
+
+  publisher:
+    image: andriiuni/events
+    container_name: publisher
+    ports:
+      - "8080:8080"
+    networks:
+      - app-network
+    environment:
+      EVENT_ENDPOINT: "http://gateway:3000/webhook"
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+ pgdata: { }
